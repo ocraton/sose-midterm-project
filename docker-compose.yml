@@ -1,0 +1,50 @@
+services:
+  # 1. Triplestore RDF (Database)
+  triplestore:
+    image: secoresearch/fuseki
+    container_name: fuseki-db
+    environment:
+      - ADMIN_PASSWORD=admin
+    ports:
+      - "3030:3030"
+    volumes:
+      # Montiamo il file locale dentro il container
+      - ./fuseki-config/dataset.ttl:/staging/dataset.ttl:ro
+    # Avviamo esplicitamente fuseki-server con gli argomenti del dataset
+    command:
+      - /jena-fuseki/fuseki-server
+      - --file=/staging/dataset.ttl
+      - /dataset
+    networks:
+      - sose-network
+
+  # 2. DaaS (Data as a Service)
+  # daas:
+  #   build:
+  #     context: ./daas
+  #     dockerfile: Dockerfile
+  #   container_name: daas-service
+  #   ports:
+  #     - "8081:8080"
+  #   depends_on:
+  #     - triplestore
+  #   networks:
+  #     - sose-network
+
+  # 3. EaaS (Ethics as a Service)
+  # eaas:
+  #   build:
+  #     context: ./eaas
+  #     dockerfile: Dockerfile
+  #   container_name: eaas-service
+  #   ports:
+  #     - "8082:8080"
+  #   volumes:
+  #     # Montiamo la cartella delle policy in sola lettura
+  #     - ./eaas/policies:/app/policies:ro
+  #   networks:
+  #     - sose-network
+
+networks:
+  sose-network:
+    driver: bridge

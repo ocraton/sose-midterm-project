@@ -1,0 +1,70 @@
+# --- 1. PREFISSI (Namespace per i vocabolari) ---
+@prefix ex: <http://example.org/uni/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# Definizione della nostra ontologia custom
+ex:Course a rdfs:Class ;
+    rdfs:label "Corso Universitario" .
+
+# --- 2. MODELLAZIONE DEI CORSI ---
+
+ex:course1 a ex:Course ;
+    ex:courseId "C001" ;
+    ex:title "Algoritmi e Strutture Dati" ;
+    ex:workload "High" ;
+    ex:hasPrerequisite true ;
+    ex:capacity 5 ;
+    ex:requiresPhysicalPresence true .
+
+ex:course2 a ex:Course ;
+    ex:courseId "C002" ;
+    ex:title "Interazione Uomo-Macchina" ;
+    ex:workload "Low" ;
+    ex:hasPrerequisite false ;
+    ex:capacity 50 ;
+    ex:requiresPhysicalPresence false .
+
+ex:course3 a ex:Course ;
+    ex:courseId "C003" ;
+    ex:title "Intelligenza Artificiale" ;
+    ex:workload "High" ;
+    ex:hasPrerequisite true ;
+    ex:capacity 30 ;
+    ex:requiresPhysicalPresence false .
+
+ex:course4 a ex:Course ;
+    ex:courseId "C004" ;
+    ex:title "Sostenibilità Digitale" ;
+    ex:workload "Low" ;
+    ex:hasPrerequisite false ;
+    ex:capacity 20 ;
+    ex:requiresPhysicalPresence false .
+
+# --- 3. MODELLAZIONE DEGLI STUDENTI ---
+
+# Alice: Studentessa lavoratrice che necessita di didattica a distanza o accessibile
+ex:student1 a foaf:Person ;
+    ex:studentId "S001" ;
+    foaf:name "Alice Rossini" ;
+    ex:isWorkingStudent true ;
+    ex:needsAccessibility true ;
+    ex:gpa "22.5"^^xsd:float .
+
+# Bob: Studente a tempo pieno, ottimo percorso accademico
+ex:student2 a foaf:Person ;
+    ex:studentId "S002" ;
+    foaf:name "Bob Bianchi" ;
+    ex:isWorkingStudent false ;
+    ex:needsAccessibility false ;
+    ex:gpa "28.5"^^xsd:float .
+
+# Charlie: Studente lavoratore, attualmente in difficoltà con la media voti (GPA basso)
+ex:student3 a foaf:Person ;
+    ex:studentId "S003" ;
+    foaf:name "Charlie Verdi" ;
+    ex:isWorkingStudent true ;
+    ex:needsAccessibility false ;
+    ex:gpa "19.0"^^xsd:float .
