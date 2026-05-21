@@ -1,0 +1,40 @@
+{
+	"policies": [
+		{
+			"id": "POL-001",
+			"name": "Accessibilità Obbligatoria",
+			"description": "Se uno studente necessita di accessibilità, il corso non deve richiedere la presenza fisica obbligatoria.",
+			"condition": "student.needsAccessibility == true && course.requiresPhysicalPresence == true",
+			"action": "REJECT",
+			"riskLevel": "HIGH",
+			"rationale": "Il corso richiede presenza fisica, ma lo studente ha necessità di accessibilità/didattica a distanza."
+		},
+		{
+			"id": "POL-002",
+			"name": "Sostenibilità Lavoratori (Carico Alto)",
+			"description": "Gli studenti lavoratori non dovrebbero essere assegnati a corsi con carico di lavoro 'High' senza un'attenta revisione.",
+			"condition": "student.isWorkingStudent == true && course.workload == 'High'",
+			"action": "REVISE",
+			"riskLevel": "MEDIUM",
+			"rationale": "Il carico di lavoro stimato è troppo alto per uno studente lavoratore. Si consiglia di rivedere il piano studi o fornire supporto."
+		},
+		{
+			"id": "POL-003",
+			"name": "Protezione Studenti in Difficoltà",
+			"description": "Se uno studente ha una media (GPA) inferiore a 20 e il corso ha un carico 'High', l'assegnazione deve essere scalata a un tutor.",
+			"condition": "student.gpa < 20.0 && course.workload == 'High'",
+			"action": "ESCALATE",
+			"riskLevel": "HIGH",
+			"rationale": "Lo studente è in difficoltà accademica (GPA basso) e il corso ha un carico elevato. Necessario intervento di un tutor accademico."
+		},
+		{
+			"id": "POL-004",
+			"name": "Assegnazione Standard",
+			"description": "Se nessuna delle policy di rischio precedenti viene innescata, l'assegnazione è considerata equa e sicura.",
+			"condition": "DEFAULT",
+			"action": "PROCEED",
+			"riskLevel": "LOW",
+			"rationale": "L'assegnazione rispetta i criteri base di equità e non presenta rischi per lo studente."
+		}
+	]
+}
