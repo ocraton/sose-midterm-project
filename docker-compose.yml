@@ -19,17 +19,17 @@ services:
       - sose-network
 
   # 2. DaaS (Data as a Service)
-  # daas:
-  #   build:
-  #     context: ./daas
-  #     dockerfile: Dockerfile
-  #   container_name: daas-service
-  #   ports:
-  #     - "8081:8080"
-  #   depends_on:
-  #     - triplestore
-  #   networks:
-  #     - sose-network
+  daas:
+    build:
+      context: ./daas
+      dockerfile: Dockerfile
+    container_name: daas-service
+    ports:
+      - "8081:8080"
+    depends_on:
+      - triplestore
+    networks:
+      - sose-network
 
   # 3. EaaS (Ethics as a Service)
   # eaas:
