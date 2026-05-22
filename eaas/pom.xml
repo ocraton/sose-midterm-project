@@ -45,24 +45,33 @@
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-assembly-plugin</artifactId>
-				<version>3.6.0</version>
+				<artifactId>maven-shade-plugin</artifactId>
+				<version>3.5.2</version>
 				<configuration>
 					<archive>
 						<manifest>
 							<mainClass>it.univaq.sose.eaas.EaaSApplication</mainClass>
 						</manifest>
 					</archive>
-					<descriptorRefs>
-						<descriptorRef>jar-with-dependencies</descriptorRef>
-					</descriptorRefs>
+					<shadedArtifactAttached>true</shadedArtifactAttached>
+					<shadedClassifierName>jar-with-dependencies</shadedClassifierName>
+					<createDependencyReducedPom>false</createDependencyReducedPom>
+					<transformers>
+						<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+							<mainClass>it.univaq.sose.eaas.EaaSApplication</mainClass>
+						</transformer>
+						<transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+						<transformer implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+							<resource>META-INF/cxf/bus-extensions.txt</resource>
+						</transformer>
+					</transformers>
 				</configuration>
 				<executions>
 					<execution>
-						<id>make-assembly</id>
+						<id>shade-fat-jar</id>
 						<phase>package</phase>
 						<goals>
-							<goal>single</goal>
+							<goal>shade</goal>
 						</goals>
 					</execution>
 				</executions>

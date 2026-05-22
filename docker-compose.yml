@@ -32,18 +32,18 @@ services:
       - sose-network
 
   # 3. EaaS (Ethics as a Service)
-  # eaas:
-  #   build:
-  #     context: ./eaas
-  #     dockerfile: Dockerfile
-  #   container_name: eaas-service
-  #   ports:
-  #     - "8082:8080"
-  #   volumes:
-  #     # Montiamo la cartella delle policy in sola lettura
-  #     - ./eaas/policies:/app/policies:ro
-  #   networks:
-  #     - sose-network
+  eaas:
+    build:
+      context: ./eaas
+      dockerfile: Dockerfile
+    container_name: eaas-service
+    ports:
+      - "8082:8080"
+    volumes:
+      # Montiamo la cartella delle policy in sola lettura
+      - ./eaas/policies:/app/policies:ro
+    networks:
+      - sose-network
 
 networks:
   sose-network:
