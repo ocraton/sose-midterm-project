@@ -42,6 +42,20 @@ services:
     volumes:
       # Montiamo la cartella delle policy in sola lettura
       - ./eaas/policies:/app/policies:ro
+    depends_on:
+      - daas
+    networks:
+      - sose-network
+
+  # 4. Client (Simulatore / Orchestratore)
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: client-app
+    depends_on:
+      - daas
+      - eaas
     networks:
       - sose-network
 
