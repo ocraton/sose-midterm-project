@@ -1,0 +1,5 @@
+# Maven build outputs
+**/target/
+
+# Logs
+*.log

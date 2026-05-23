@@ -73,6 +73,12 @@ services:
       context: ./client
       dockerfile: Dockerfile
     container_name: client-app
+    environment:
+      - DAAS_URL=http://daas:8080/api
+      - EAAS_URL=http://eaas:8080/api/evaluate
+      - HTTP_MAX_RETRIES=3
+      - HTTP_TIMEOUT_MS=3000
+      - HTTP_RETRY_BACKOFF_MS=500
     depends_on:
       daas:
         condition: service_healthy
