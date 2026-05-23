@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.QueryParam;
@@ -14,6 +15,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 import org.apache.jena.query.QueryExecution;
+import org.apache.jena.query.ParameterizedSparqlString;
 import org.apache.jena.query.QuerySolution;
 import org.apache.jena.query.ResultSet;
 import org.apache.jena.rdf.model.RDFNode;
@@ -27,9 +29,10 @@ public class CourseResource {
         "PREFIX foaf: <http://xmlns.com/foaf/0.1/> ";
 
     // Metodo di utilità: esegue la query e formatta i risultati per evitare di ripetere codice
-    private List<Map<String, String>> executeSparql(String queryString, String[] vars) {
+    protected List<Map<String, String>> executeSparql(String queryString, String[] vars) {
         List<Map<String, String>> list = new ArrayList<>();
-        try (QueryExecution qexec = QueryExecution.service(SPARQL_ENDPOINT).query(PREFIXES + queryString).build()) {
+        String query = queryString.startsWith("PREFIX ") ? queryString : PREFIXES + queryString;
+        try (QueryExecution qexec = QueryExecution.service(SPARQL_ENDPOINT).query(query).build()) {
             ResultSet results = qexec.execSelect();
             while (results.hasNext()) {
                 QuerySolution soln = results.nextSolution();
@@ -45,6 +48,72 @@ public class CourseResource {
             }
         }
         return list;
+    }
+
+    static boolean isValidIdentifier(String value) {
+        return value != null && !value.isBlank() && value.matches("[A-Za-z0-9_-]+");
+    }
+
+    static boolean isValidWorkload(String value) {
+        return value != null && ("High".equalsIgnoreCase(value) || "Low".equalsIgnoreCase(value));
+    }
+
+    static Boolean parsePhysicalFilter(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        if ("true".equalsIgnoreCase(value)) {
+            return Boolean.TRUE;
+        }
+        if ("false".equalsIgnoreCase(value)) {
+            return Boolean.FALSE;
+        }
+        throw new BadRequestException("Parametro physical non valido");
+    }
+
+    static String buildCourseByIdQuery(String id) {
+        ParameterizedSparqlString query = new ParameterizedSparqlString(PREFIXES +
+                "SELECT ?title ?workload ?capacity ?prereq ?physical WHERE { " +
+                "?course a ex:Course ; ex:courseId ?courseId ; ex:title ?title ; " +
+                "ex:workload ?workload ; ex:capacity ?capacity ; " +
+                "ex:hasPrerequisite ?prereq ; ex:requiresPhysicalPresence ?physical . " +
+                "FILTER(?courseId = ?courseIdFilter) }");
+        query.setLiteral("courseIdFilter", id);
+        return query.toString();
+    }
+
+    static String buildStudentByIdQuery(String id) {
+        ParameterizedSparqlString query = new ParameterizedSparqlString(PREFIXES +
+                "SELECT ?name ?working ?accessibility ?gpa WHERE { " +
+                "?s a foaf:Person ; ex:studentId ?studentId ; foaf:name ?name ; " +
+                "ex:isWorkingStudent ?working ; ex:needsAccessibility ?accessibility ; ex:gpa ?gpa . " +
+                "FILTER(?studentId = ?studentIdFilter) }");
+        query.setLiteral("studentIdFilter", id);
+        return query.toString();
+    }
+
+    static String buildSearchCoursesQuery(String workload, Boolean physical) {
+        ParameterizedSparqlString query = new ParameterizedSparqlString(PREFIXES +
+                "SELECT ?id ?title ?workload ?physical WHERE { " +
+                "?course a ex:Course ; ex:courseId ?id ; ex:title ?title ; " +
+                "ex:workload ?workload ; ex:requiresPhysicalPresence ?physical . ");
+
+        if (workload != null && !workload.isBlank()) {
+            query.append("FILTER(?workload = ?workloadFilter) ");
+            query.setLiteral("workloadFilter", workload);
+        }
+
+        if (physical != null) {
+            query.append("FILTER(?physical = ?physicalFilter) ");
+            query.setLiteral("physicalFilter", physical);
+        }
+
+        query.append("}");
+        return query.toString();
+    }
+
+    private Response badRequest(String message) {
+        return Response.status(400).entity("{\"error\":\"" + message + "\"}").build();
     }
 
     // 1. GET /api/courses
@@ -64,10 +133,11 @@ public class CourseResource {
     @Path("/courses/{id}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getCourseById(@PathParam("id") String id) {
-        String query = "SELECT ?title ?workload ?capacity ?prereq ?physical WHERE { " +
-                       "?course a ex:Course ; ex:courseId \"" + id + "\" ; ex:title ?title ; " +
-                       "ex:workload ?workload ; ex:capacity ?capacity ; " +
-                       "ex:hasPrerequisite ?prereq ; ex:requiresPhysicalPresence ?physical . }";
+        if (!isValidIdentifier(id)) {
+            return badRequest("Parametro id non valido");
+        }
+
+        String query = buildCourseByIdQuery(id);
         List<Map<String, String>> res = executeSparql(query, new String[]{"title", "workload", "capacity", "prereq", "physical"});
         if (res.isEmpty()) return Response.status(404).entity("{\"error\":\"Corso non trovato\"}").build();
         return Response.ok(res.get(0)).build();
@@ -89,9 +159,11 @@ public class CourseResource {
     @Path("/students/{id}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getStudentById(@PathParam("id") String id) {
-        String query = "SELECT ?name ?working ?accessibility ?gpa WHERE { " +
-                       "?s a foaf:Person ; ex:studentId \"" + id + "\" ; foaf:name ?name ; " +
-                       "ex:isWorkingStudent ?working ; ex:needsAccessibility ?accessibility ; ex:gpa ?gpa . }";
+        if (!isValidIdentifier(id)) {
+            return badRequest("Parametro id non valido");
+        }
+
+        String query = buildStudentByIdQuery(id);
         List<Map<String, String>> res = executeSparql(query, new String[]{"name", "working", "accessibility", "gpa"});
         if (res.isEmpty()) return Response.status(404).entity("{\"error\":\"Studente non trovato\"}").build();
         return Response.ok(res.get(0)).build();
@@ -102,19 +174,18 @@ public class CourseResource {
     @Path("/courses/search")
     @Produces(MediaType.APPLICATION_JSON)
     public Response searchCourses(@QueryParam("workload") String workload, @QueryParam("physical") String physical) {
-        String query = "SELECT ?id ?title ?workload ?physical WHERE { " +
-                       "?course a ex:Course ; ex:courseId ?id ; ex:title ?title ; " +
-                       "ex:workload ?workload ; ex:requiresPhysicalPresence ?physical . ";
-        
-        // Aggiungiamo i filtri SPARQL solo se l'utente li ha richiesti nell'URL
-        if (workload != null && !workload.isEmpty()) {
-            query += "FILTER(?workload = \"" + workload + "\") ";
+        if (workload != null && !workload.isBlank() && !isValidWorkload(workload)) {
+            return badRequest("Parametro workload non valido");
         }
-        if (physical != null && !physical.isEmpty()) {
-            query += "FILTER(?physical = " + physical + ") ";
+
+        Boolean physicalFilter;
+        try {
+            physicalFilter = parsePhysicalFilter(physical);
+        } catch (BadRequestException ex) {
+            return badRequest(ex.getMessage());
         }
-        query += "}";
-        
+
+        String query = buildSearchCoursesQuery(workload, physicalFilter);
         return Response.ok(executeSparql(query, new String[]{"id", "title", "workload", "physical"})).build();
     }
 }
