@@ -3,6 +3,7 @@ package it.univaq.sose.eaas;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
@@ -28,6 +29,13 @@ public class EthicsResource {
 
     // Il percorso all'interno del container Docker (definito nel docker-compose.yml)
     private static final String POLICIES_FILE_PATH = "/app/policies/corsi_policies.json";
+
+    @GET
+    @Path("/health")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response health() {
+        return Response.ok(Map.of("status", "UP")).build();
+    }
 
     @POST
     @Path("/evaluate")

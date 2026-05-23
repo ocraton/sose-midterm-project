@@ -15,6 +15,12 @@ services:
       - /jena-fuseki/fuseki-server
       - --file=/staging/dataset.ttl
       - /dataset
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3030/$/ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     networks:
       - sose-network
 
@@ -27,7 +33,14 @@ services:
     ports:
       - "8081:8080"
     depends_on:
-      - triplestore
+      triplestore:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     networks:
       - sose-network
 
@@ -43,7 +56,14 @@ services:
       # Montiamo la cartella delle policy in sola lettura
       - ./eaas/policies:/app/policies:ro
     depends_on:
-      - daas
+      daas:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     networks:
       - sose-network
 
@@ -54,8 +74,10 @@ services:
       dockerfile: Dockerfile
     container_name: client-app
     depends_on:
-      - daas
-      - eaas
+      daas:
+        condition: service_healthy
+      eaas:
+        condition: service_healthy
     networks:
       - sose-network
 

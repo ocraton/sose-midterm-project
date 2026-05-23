@@ -22,9 +22,6 @@ public class ClientApplication {
         System.out.println("=== AVVIO CLIENT ORCHESTRATORE ===");
 
         try {
-            // Aspettiamo 5 secondi per dare tempo a DaaS ed EaaS di avviarsi nel container
-            Thread.sleep(5000);
-
             // 1. Chiediamo al DaaS i dati dello Studente (Alice)
             System.out.println("\n1. Richiesta dati studente S001 (Alice) al DaaS...");
             JsonNode student = fetchJson(DAAS_URL + "/students/S001");

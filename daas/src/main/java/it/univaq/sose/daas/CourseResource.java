@@ -116,6 +116,13 @@ public class CourseResource {
         return Response.status(400).entity("{\"error\":\"" + message + "\"}").build();
     }
 
+    @GET
+    @Path("/health")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response health() {
+        return Response.ok(Map.of("status", "UP")).build();
+    }
+
     // 1. GET /api/courses
     @GET
     @Path("/courses")
