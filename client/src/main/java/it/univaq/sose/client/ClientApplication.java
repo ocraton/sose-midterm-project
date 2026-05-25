@@ -18,6 +18,7 @@ public class ClientApplication {
     private static final int HTTP_MAX_RETRIES = getEnvOrDefaultInt("HTTP_MAX_RETRIES", 3);
     private static final int HTTP_TIMEOUT_MS = getEnvOrDefaultInt("HTTP_TIMEOUT_MS", 3000);
     private static final int HTTP_RETRY_BACKOFF_MS = getEnvOrDefaultInt("HTTP_RETRY_BACKOFF_MS", 500);
+    private static final int DEMO_PAUSE_MS = getEnvOrDefaultInt("DEMO_PAUSE_MS", 0);
 
     private static final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofMillis(HTTP_TIMEOUT_MS))
@@ -25,51 +26,63 @@ public class ClientApplication {
     private static final ObjectMapper mapper = new ObjectMapper();
 
     public static void main(String[] args) {
-        System.out.println("=== AVVIO CLIENT ORCHESTRATORE ===");
-        System.out.println("Configurazione: DAAS_URL=" + DAAS_URL + " | EAAS_URL=" + EAAS_URL);
+        System.out.println("==========================================");
+        System.out.println("    AVVIO CLIENT ORCHESTRATORE (DEMO)     ");
+        System.out.println("==========================================");
+        System.out.println("Configurazione: DAAS_URL=" + DAAS_URL + " | EAAS_URL=" + EAAS_URL + " | DEMO_PAUSE_MS=" + DEMO_PAUSE_MS);
 
         try {
-            // 1. Chiediamo al DaaS i dati dello Studente (Alice)
-            System.out.println("\n1. Richiesta dati studente S001 (Alice) al DaaS...");
-            JsonNode student = fetchJson(DAAS_URL + "/students/S001", "student S001");
-            System.out.println("Studente recuperato: " + requireTextField(student, "name", "student S001"));
-
-            // 2. Chiediamo al DaaS i dati del Corso (Algoritmi)
-            System.out.println("2. Richiesta dati corso C001 (Algoritmi) al DaaS...");
-            JsonNode course = fetchJson(DAAS_URL + "/courses/C001", "course C001");
-            System.out.println("Corso recuperato: " + requireTextField(course, "title", "course C001"));
-
-            // 3. Normalizziamo il payload con le chiavi attese dall'EaaS
-            ObjectNode payload = normalizeForEaas(student, course);
-            String jsonPayload = mapper.writeValueAsString(payload);
-
-            // 4. Inviamo la proposta all'EaaS per la valutazione
-            System.out.println("\n3. Invio della proposta di assegnazione all'EaaS per valutazione etica...");
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(EAAS_URL))
-                    .header("Content-Type", "application/json")
-                    .timeout(Duration.ofMillis(HTTP_TIMEOUT_MS))
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
-                    .build();
-
-            String responseBody = sendWithRetry(request, "POST", EAAS_URL, "EaaS evaluation");
-
-            // 5. Leggiamo il Verdetto (Audit Trail)
-            JsonNode verdict = mapper.readTree(responseBody);
-
-            System.out.println("\n========================================");
-            System.out.println("       VERDETTO EAAS RICEVUTO");
-            System.out.println("========================================");
-            System.out.println("DECISIONE  : " + safeText(verdict, "decision"));
-            System.out.println("RISCHIO    : " + safeText(verdict, "riskLevel"));
-            System.out.println("POLICY ID  : " + safeText(verdict, "appliedPolicy"));
-            System.out.println("MOTIVAZIONE: " + safeText(verdict, "rationale"));
-            System.out.println("========================================\n");
+            runScenario("SCENARIO 1 - Caso a rischio (atteso: REJECT)", "S001", "Alice", "C001", "Algoritmi e Strutture Dati");
+            pauseForDemo();
+            runScenario("SCENARIO 2 - Caso sicuro (atteso: PROCEED)", "S002", "Bob", "C002", "Interazione Uomo-Macchina");
 
         } catch (Exception e) {
             System.err.println("Errore nel flusso client: " + e.getMessage());
             e.printStackTrace(System.err);
         }
+    }
+
+    private static void pauseForDemo() throws InterruptedException {
+        if (DEMO_PAUSE_MS <= 0) {
+            return;
+        }
+        System.out.println("\n[Pausa demo] Attendo " + DEMO_PAUSE_MS + " ms prima del prossimo scenario...\n");
+        Thread.sleep(DEMO_PAUSE_MS);
+    }
+
+    private static void runScenario(String scenarioTitle, String studentId, String studentLabel, String courseId, String courseLabel) throws Exception {
+        System.out.println("\n========================================");
+        System.out.println(scenarioTitle);
+        System.out.println("========================================");
+
+        System.out.println("1. Richiesta dati studente " + studentId + " (" + studentLabel + ") al DaaS...");
+        JsonNode student = fetchJson(DAAS_URL + "/students/" + studentId, "student " + studentId);
+        System.out.println("Studente recuperato: " + requireTextField(student, "name", "student " + studentId));
+
+        System.out.println("2. Richiesta dati corso " + courseId + " (" + courseLabel + ") al DaaS...");
+        JsonNode course = fetchJson(DAAS_URL + "/courses/" + courseId, "course " + courseId);
+        System.out.println("Corso recuperato: " + requireTextField(course, "title", "course " + courseId));
+
+        ObjectNode payload = normalizeForEaas(student, course);
+        String jsonPayload = mapper.writeValueAsString(payload);
+
+        System.out.println("3. Invio della proposta di assegnazione all'EaaS per valutazione etica...");
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(EAAS_URL))
+                .header("Content-Type", "application/json")
+                .timeout(Duration.ofMillis(HTTP_TIMEOUT_MS))
+                .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
+                .build();
+
+        String responseBody = sendWithRetry(request, "POST", EAAS_URL, "EaaS evaluation");
+        JsonNode verdict = mapper.readTree(responseBody);
+
+        System.out.println("\nVERDETTO EAAS");
+        System.out.println("DECISIONE  : " + safeText(verdict, "decision"));
+        System.out.println("RISCHIO    : " + safeText(verdict, "riskLevel"));
+        System.out.println("POLICY ID  : " + safeText(verdict, "appliedPolicy"));
+        System.out.println("MOTIVAZIONE: " + safeText(verdict, "rationale"));
+        System.out.println("----------------------------------------");
     }
 
     private static JsonNode fetchJson(String url, String operation) throws Exception {
