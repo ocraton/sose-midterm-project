@@ -79,6 +79,7 @@ services:
       - HTTP_MAX_RETRIES=3
       - HTTP_TIMEOUT_MS=3000
       - HTTP_RETRY_BACKOFF_MS=500
+      - DEMO_PAUSE_MS=2000
     depends_on:
       daas:
         condition: service_healthy
