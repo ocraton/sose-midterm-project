@@ -9,9 +9,11 @@ public class DaaSApplication {
     public static void main(String[] args) throws Exception {
         JAXRSServerFactoryBean factoryBean = new JAXRSServerFactoryBean();
         
-        // Diciamo a CXF quale classe contiene le nostre API REST
-        factoryBean.setResourceClasses(CourseResource.class);
+        // Registriamo risorse separate per health, corsi e studenti
+        factoryBean.setResourceClasses(HealthResource.class, CourseResource.class, StudentResource.class);
+        factoryBean.setResourceProvider(HealthResource.class, new SingletonResourceProvider(new HealthResource()));
         factoryBean.setResourceProvider(CourseResource.class, new SingletonResourceProvider(new CourseResource()));
+        factoryBean.setResourceProvider(StudentResource.class, new SingletonResourceProvider(new StudentResource()));
         
         // Aggiungiamo Jackson per la gestione automatica del JSON
         factoryBean.setProvider(new JacksonJsonProvider());
