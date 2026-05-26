@@ -76,12 +76,13 @@ public class ClientApplication {
 
         String responseBody = sendWithRetry(request, "POST", EAAS_URL, "EaaS evaluation");
         JsonNode verdict = mapper.readTree(responseBody);
+        JsonNode outcome = verdict.path("outcome");
 
         System.out.println("\nVERDETTO EAAS");
-        System.out.println("DECISIONE  : " + safeText(verdict, "decision"));
-        System.out.println("RISCHIO    : " + safeText(verdict, "riskLevel"));
-        System.out.println("POLICY ID  : " + safeText(verdict, "appliedPolicy"));
-        System.out.println("MOTIVAZIONE: " + safeText(verdict, "rationale"));
+        System.out.println("DECISIONE  : " + safeText(outcome, "decision"));
+        System.out.println("RISCHIO    : " + safeText(outcome, "riskLevel"));
+        System.out.println("POLICY ID  : " + safeText(outcome, "appliedPolicy"));
+        System.out.println("MOTIVAZIONE: " + safeText(outcome, "rationale"));
         System.out.println("----------------------------------------");
     }
 

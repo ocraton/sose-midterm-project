@@ -181,12 +181,13 @@ public class EthicsResource {
             String appliedPolicyId = appliedPolicy.get("id").asText();
             String action = appliedPolicy.get("action").asText();
             String riskLevel = appliedPolicy.get("riskLevel").asText();
+            String rationale = appliedPolicy.get("rationale").asText();
 
-            // Manteniamo i campi legacy a top-level per retrocompatibilita'
-            decision.put("decision", action);
-            decision.put("riskLevel", riskLevel);
-            decision.put("appliedPolicy", appliedPolicyId);
-            decision.put("rationale", appliedPolicy.get("rationale").asText());
+            Map<String, Object> outcome = new HashMap<>();
+            outcome.put("decision", action);
+            outcome.put("riskLevel", riskLevel);
+            outcome.put("appliedPolicy", appliedPolicyId);
+            outcome.put("rationale", rationale);
 
             List<String> requiredActions = new ArrayList<>();
             if ("HIGH".equalsIgnoreCase(riskLevel) || "CRITICAL".equalsIgnoreCase(riskLevel)) {
@@ -213,6 +214,7 @@ public class EthicsResource {
 
             appendAudit(auditTrace);
 
+            decision.put("outcome", outcome);
             decision.put("auditId", auditId);
             decision.put("timestamp", evaluatedAt);
             decision.put("requiredActions", requiredActions);
