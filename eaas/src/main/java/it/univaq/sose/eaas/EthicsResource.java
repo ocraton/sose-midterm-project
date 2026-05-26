@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.apache.commons.jexl3.JexlBuilder;
@@ -19,7 +21,10 @@ import java.io.File;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -29,12 +34,66 @@ public class EthicsResource {
 
     // Il percorso all'interno del container Docker (definito nel docker-compose.yml)
     private static final String POLICIES_FILE_PATH = "/app/policies/corsi_policies.json";
+    private static final int AUDIT_MAX_ENTRIES = getEnvOrDefaultInt("EAAS_AUDIT_MAX_ENTRIES", 200);
+    private static final Deque<Map<String, Object>> AUDIT_STORE = new LinkedList<>();
 
     @GET
     @Path("/health")
     @Produces(MediaType.APPLICATION_JSON)
     public Response health() {
         return Response.ok(Map.of("status", "UP")).build();
+    }
+
+    @GET
+    @Path("/audits")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response listAudits(@QueryParam("limit") Integer limit) {
+        int requestedLimit = limit != null ? limit : 50;
+        if (requestedLimit <= 0) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "Parametro 'limit' non valido: deve essere > 0"))
+                    .build();
+        }
+
+        int effectiveLimit = Math.min(requestedLimit, AUDIT_MAX_ENTRIES);
+        List<Map<String, Object>> snapshot;
+        synchronized (AUDIT_STORE) {
+            List<Map<String, Object>> all = new ArrayList<>(AUDIT_STORE);
+            Collections.reverse(all); // piu' recenti prima
+            int toIndex = Math.min(effectiveLimit, all.size());
+            snapshot = all.subList(0, toIndex);
+        }
+
+        return Response.ok(Map.of(
+                "count", snapshot.size(),
+                "limit", effectiveLimit,
+                "maxEntries", AUDIT_MAX_ENTRIES,
+                "items", snapshot
+        )).build();
+    }
+
+    @GET
+    @Path("/audits/{requestId}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getAuditByRequestId(@PathParam("requestId") String requestId) {
+        if (requestId == null || requestId.isBlank()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "requestId mancante"))
+                    .build();
+        }
+
+        synchronized (AUDIT_STORE) {
+            for (Map<String, Object> audit : AUDIT_STORE) {
+                Object storedRequestId = audit.get("requestId");
+                if (storedRequestId != null && requestId.equals(storedRequestId.toString())) {
+                    return Response.ok(audit).build();
+                }
+            }
+        }
+
+        return Response.status(Response.Status.NOT_FOUND)
+                .entity(Map.of("error", "Audit non trovato", "requestId", requestId))
+                .build();
     }
 
     @POST
@@ -152,6 +211,8 @@ public class EthicsResource {
             auditTrace.put("evaluatedPolicies", evaluatedPolicies);
             auditTrace.put("appliedPolicy", appliedPolicyId);
 
+            appendAudit(auditTrace);
+
             decision.put("auditId", auditId);
             decision.put("timestamp", evaluatedAt);
             decision.put("requiredActions", requiredActions);
@@ -166,6 +227,29 @@ public class EthicsResource {
         } catch (Exception e) {
             e.printStackTrace();
             return Response.serverError().entity("{\"error\": \"Errore interno EaaS: " + e.getMessage() + "\"}").build();
+        }
+    }
+
+    private static void appendAudit(Map<String, Object> auditTrace) {
+        synchronized (AUDIT_STORE) {
+            if (AUDIT_STORE.size() >= AUDIT_MAX_ENTRIES) {
+                AUDIT_STORE.removeFirst();
+            }
+            AUDIT_STORE.addLast(auditTrace);
+        }
+    }
+
+    private static int getEnvOrDefaultInt(String key, int defaultValue) {
+        String value = System.getenv(key);
+        if (value == null || value.isBlank()) {
+            return defaultValue;
+        }
+        try {
+            int parsed = Integer.parseInt(value);
+            return parsed > 0 ? parsed : defaultValue;
+        } catch (NumberFormatException e) {
+            System.err.println("Valore env non valido per " + key + "='" + value + "', uso default=" + defaultValue);
+            return defaultValue;
         }
     }
 }
