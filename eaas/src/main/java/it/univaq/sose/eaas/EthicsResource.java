@@ -133,43 +133,10 @@ public class EthicsResource {
             context.set("course", course);
 
             Map<String, Object> decision = new HashMap<>();
-            List<Map<String, Object>> evaluatedPolicies = new ArrayList<>();
-            JsonNode appliedPolicy = null;
-            boolean hasMatchedNonDefaultPolicy = false;
-
-            for (JsonNode policy : policies) {
-                String id = policy.get("id").asText();
-                String conditionString = policy.path("condition").asText("DEFAULT");
-                boolean conditionMet = false;
-
-                if ("DEFAULT".equals(conditionString)) {
-                    conditionMet = !hasMatchedNonDefaultPolicy; // Default solo se nessuna policy di rischio e' stata attivata
-                } else {
-                    try {
-                        JexlExpression expression = jexl.createExpression(conditionString);
-                        conditionMet = Boolean.TRUE.equals(expression.evaluate(context));
-                    } catch (Exception evalException) {
-                        System.err.println("Errore nella valutazione della policy " + id + ": " + evalException.getMessage());
-                        conditionMet = false;
-                    }
-                }
-
-                if (!"DEFAULT".equals(conditionString) && conditionMet) {
-                    hasMatchedNonDefaultPolicy = true;
-                }
-
-                Map<String, Object> evaluatedPolicy = new HashMap<>();
-                evaluatedPolicy.put("policyId", id);
-                evaluatedPolicy.put("evaluated", conditionMet);
-                evaluatedPolicy.put("condition", conditionString);
-                evaluatedPolicy.put("action", policy.get("action").asText());
-                evaluatedPolicy.put("riskLevel", policy.get("riskLevel").asText());
-                evaluatedPolicies.add(evaluatedPolicy);
-
-                if (conditionMet && appliedPolicy == null) {
-                    appliedPolicy = policy;
-                }
-            }
+            // Valutiamo tutte le policy e teniamo la prima applicabile come outcome finale.
+            PolicyEvaluationResult evaluation = evaluatePolicies(policies, jexl, context);
+            List<Map<String, Object>> evaluatedPolicies = evaluation.evaluatedPolicies();
+            JsonNode appliedPolicy = evaluation.appliedPolicy();
 
             if (appliedPolicy == null) {
                 return Response.serverError().entity("{\"error\": \"Nessuna policy applicabile trovata\"}").build();
@@ -183,34 +150,10 @@ public class EthicsResource {
             String riskLevel = appliedPolicy.get("riskLevel").asText();
             String rationale = appliedPolicy.get("rationale").asText();
 
-            Map<String, Object> outcome = new HashMap<>();
-            outcome.put("decision", action);
-            outcome.put("riskLevel", riskLevel);
-            outcome.put("appliedPolicy", appliedPolicyId);
-            outcome.put("rationale", rationale);
-
-            List<String> requiredActions = new ArrayList<>();
-            if ("HIGH".equalsIgnoreCase(riskLevel) || "CRITICAL".equalsIgnoreCase(riskLevel)) {
-                requiredActions.add("MANUAL_REVIEW_REQUIRED");
-            }
-            if ("REJECT".equalsIgnoreCase(action)) {
-                requiredActions.add("DO_NOT_ASSIGN_COURSE");
-            } else if ("ESCALATE".equalsIgnoreCase(action)) {
-                requiredActions.add("ASSIGN_TUTOR_ESCALATION");
-            } else if ("REVISE".equalsIgnoreCase(action)) {
-                requiredActions.add("REVISE_STUDY_PLAN");
-            }
-
-            Map<String, Object> inputSnapshot = new HashMap<>();
-            inputSnapshot.put("student", student);
-            inputSnapshot.put("course", course);
-
-            Map<String, Object> auditTrace = new HashMap<>();
-            auditTrace.put("requestId", auditId);
-            auditTrace.put("evaluatedAt", evaluatedAt);
-            auditTrace.put("inputSnapshot", inputSnapshot);
-            auditTrace.put("evaluatedPolicies", evaluatedPolicies);
-            auditTrace.put("appliedPolicy", appliedPolicyId);
+            Map<String, Object> outcome = buildOutcome(action, riskLevel, appliedPolicyId, rationale);
+            List<String> requiredActions = buildRequiredActions(action, riskLevel);
+            Map<String, Object> inputSnapshot = buildInputSnapshot(student, course);
+            Map<String, Object> auditTrace = buildAuditTrace(auditId, evaluatedAt, inputSnapshot, evaluatedPolicies, appliedPolicyId);
 
             appendAudit(auditTrace);
 
@@ -239,6 +182,119 @@ public class EthicsResource {
             }
             AUDIT_STORE.addLast(auditTrace);
         }
+    }
+
+    private static PolicyEvaluationResult evaluatePolicies(JsonNode policies, JexlEngine jexl, JexlContext context) {
+        List<Map<String, Object>> evaluatedPolicies = new ArrayList<>();
+        JsonNode appliedPolicy = null;
+        boolean hasMatchedNonDefaultPolicy = false;
+
+        for (JsonNode policy : policies) {
+            String id = policy.get("id").asText();
+            String conditionString = policy.path("condition").asText("DEFAULT");
+
+            boolean conditionMet = evaluateCondition(conditionString, id, jexl, context, hasMatchedNonDefaultPolicy);
+            if (!"DEFAULT".equals(conditionString) && conditionMet) {
+                hasMatchedNonDefaultPolicy = true;
+            }
+
+            evaluatedPolicies.add(buildEvaluatedPolicyRecord(policy, id, conditionString, conditionMet));
+
+            // L'ordine nel JSON e' significativo: la prima policy vera diventa quella applicata.
+            if (conditionMet && appliedPolicy == null) {
+                appliedPolicy = policy;
+            }
+        }
+
+        return new PolicyEvaluationResult(appliedPolicy, evaluatedPolicies);
+    }
+
+    private static boolean evaluateCondition(
+            String conditionString,
+            String policyId,
+            JexlEngine jexl,
+            JexlContext context,
+            boolean hasMatchedNonDefaultPolicy
+    ) {
+        if ("DEFAULT".equals(conditionString)) {
+            return !hasMatchedNonDefaultPolicy;
+        }
+
+        try {
+            JexlExpression expression = jexl.createExpression(conditionString);
+            return Boolean.TRUE.equals(expression.evaluate(context));
+        } catch (Exception evalException) {
+            System.err.println("Errore nella valutazione della policy " + policyId + ": " + evalException.getMessage());
+            return false;
+        }
+    }
+
+    private static Map<String, Object> buildEvaluatedPolicyRecord(
+            JsonNode policy,
+            String policyId,
+            String condition,
+            boolean evaluated
+    ) {
+        Map<String, Object> evaluatedPolicy = new HashMap<>();
+        evaluatedPolicy.put("policyId", policyId);
+        evaluatedPolicy.put("evaluated", evaluated);
+        evaluatedPolicy.put("condition", condition);
+        evaluatedPolicy.put("action", policy.get("action").asText());
+        evaluatedPolicy.put("riskLevel", policy.get("riskLevel").asText());
+        return evaluatedPolicy;
+    }
+
+    private static Map<String, Object> buildOutcome(String action, String riskLevel, String appliedPolicyId, String rationale) {
+        Map<String, Object> outcome = new HashMap<>();
+        outcome.put("decision", action);
+        outcome.put("riskLevel", riskLevel);
+        outcome.put("appliedPolicy", appliedPolicyId);
+        outcome.put("rationale", rationale);
+        return outcome;
+    }
+
+    private static List<String> buildRequiredActions(String action, String riskLevel) {
+        List<String> requiredActions = new ArrayList<>();
+
+        if ("HIGH".equalsIgnoreCase(riskLevel) || "CRITICAL".equalsIgnoreCase(riskLevel)) {
+            requiredActions.add("MANUAL_REVIEW_REQUIRED");
+        }
+
+        if ("REJECT".equalsIgnoreCase(action)) {
+            requiredActions.add("DO_NOT_ASSIGN_COURSE");
+        } else if ("ESCALATE".equalsIgnoreCase(action)) {
+            requiredActions.add("ASSIGN_TUTOR_ESCALATION");
+        } else if ("REVISE".equalsIgnoreCase(action)) {
+            requiredActions.add("REVISE_STUDY_PLAN");
+        }
+
+        return requiredActions;
+    }
+
+    private static Map<String, Object> buildInputSnapshot(Map<String, Object> student, Map<String, Object> course) {
+        Map<String, Object> inputSnapshot = new HashMap<>();
+        inputSnapshot.put("student", student);
+        inputSnapshot.put("course", course);
+        return inputSnapshot;
+    }
+
+    private static Map<String, Object> buildAuditTrace(
+            String auditId,
+            String evaluatedAt,
+            Map<String, Object> inputSnapshot,
+            List<Map<String, Object>> evaluatedPolicies,
+            String appliedPolicyId
+    ) {
+        Map<String, Object> auditTrace = new HashMap<>();
+        auditTrace.put("requestId", auditId);
+        auditTrace.put("evaluatedAt", evaluatedAt);
+        auditTrace.put("inputSnapshot", inputSnapshot);
+        auditTrace.put("evaluatedPolicies", evaluatedPolicies);
+        auditTrace.put("appliedPolicy", appliedPolicyId);
+        return auditTrace;
+    }
+
+    private record PolicyEvaluationResult(JsonNode appliedPolicy, List<Map<String, Object>> evaluatedPolicies) {
     }
 
     private static int getEnvOrDefaultInt(String key, int defaultValue) {
