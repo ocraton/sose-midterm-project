@@ -60,6 +60,17 @@ DaaS is exposed on port `8081` (internal `daas:8080/api`) and provides at least 
 | `GET` | `/api/students` | Returns the complete list of students. |
 | `GET` | `/api/students/{id}` | Returns one student by id. |
 
+### API Documentation (Swagger UI)
+Interactive API documentation is automatically generated via Swagger UI (OpenAPI v3).
+
+Official and only URL to use:
+- http://localhost:8081/api/docs
+
+The OpenAPI specification consumed by the UI is:
+- http://localhost:8081/openapi.json
+
+Note: do not use `/api-docs` for the demo, because it may show the default Swagger example instead of the project APIs.
+
 ## EaaS Endpoints and Policies
 EaaS is exposed on port `8082` and provides the following endpoints:
 
