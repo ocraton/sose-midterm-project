@@ -27,11 +27,12 @@ docker compose up --build
 Healthchecks are enabled: DaaS waits for Fuseki, and the client waits for DaaS and EaaS.
 
 ## Demo Instructions
-After startup, the client runs automatically and:
-1. Fetches student `S001` from DaaS.
-2. Fetches course `C001` from DaaS.
-3. Sends the proposal to EaaS.
-4. Prints the final audit result (decision, risk level, rationale) to console.
+After startup, the client runs automatically and executes three end-to-end scenarios:
+1. Scenario 1 (expected: REJECT): student `S001` + course `C001`.
+2. Scenario 2 (expected: PROCEED): student `S002` + course `C002`.
+3. Scenario 3 (expected: ESCALATE): student `S003` + course `C003`.
+
+For each scenario, the orchestrator fetches student/course data from DaaS, sends the proposal to EaaS, and prints the final audit result (decision, risk level, rationale). If `DEMO_PAUSE_MS` is set to a value greater than `0`, a pause is applied between scenarios.
 
 To inspect EaaS audit traces in logs:
 

@@ -35,6 +35,8 @@ public class ClientApplication {
             runScenario("SCENARIO 1 - Caso a rischio (atteso: REJECT)", "S001", "Alice", "C001", "Algoritmi e Strutture Dati");
             pauseForDemo();
             runScenario("SCENARIO 2 - Caso sicuro (atteso: PROCEED)", "S002", "Bob", "C002", "Interazione Uomo-Macchina");
+            pauseForDemo();
+            runScenario("SCENARIO 3 - Caso limite etico (atteso: ESCALATE)", "S003", "Charlie", "C003", "Intelligenza Artificiale");
 
         } catch (Exception e) {
             System.err.println("Errore nel flusso client: " + e.getMessage());
