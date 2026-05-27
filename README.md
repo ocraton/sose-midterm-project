@@ -49,27 +49,29 @@ docker compose down -v
 The DaaS queries an RDF dataset (`dataset.ttl`) modeled with standard prefixes (`foaf:`) and a custom vocabulary (`ex:`).
 Main classes are `foaf:Person` (Student) and `ex:Course` (Course).
 
-DaaS is exposed on port `8081` (internal `daas:8080/api`) and provides at least these 5 endpoints:
+DaaS is exposed on port `8081` (internal `daas:8080/api`) and provides at least these 6 endpoints:
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
+| `GET` | `/api/health` | Service health check (returns status `UP`). |
 | `GET` | `/api/courses` | Returns the complete list of courses. |
 | `GET` | `/api/courses/{id}` | Returns one course by id. |
+| `GET` | `/api/courses/search` | Advanced search by optional filters: `workload` (`High`/`Low`) and `physical` (`true`/`false`). |
 | `GET` | `/api/students` | Returns the complete list of students. |
 | `GET` | `/api/students/{id}` | Returns one student by id. |
-| `GET` | `/api/courses/search` | Advanced search with multiple filters. |
 
-All endpoints return JSON.
+## EaaS Endpoints and Policies
+EaaS is exposed on port `8082` and provides the following endpoints:
 
-## EaaS Endpoint and Policies
-EaaS is exposed on port `8082` with endpoint:
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/health` | Service health check (returns status `UP`). |
+| `GET` | `/api/audits` | Returns audit trail entries (supports optional query param `limit`, default 50). |
+| `GET` | `/api/audits/{requestId}` | Returns one audit entry by request id. |
+| `POST` | `/api/evaluate` | Evaluates a student-course proposal and returns outcome plus audit trace. |
 
-```text
-POST /api/evaluate
-```
+Input for `/api/evaluate`: JSON containing student and course data.
 
-Input: JSON containing student and course data.
-
-Output: structured audit trail including `auditId`, `timestamp`, `decision`, `riskLevel`, and `rationale`.
+Output: structured response including `outcome`, `auditId`, `timestamp`, `requiredActions`, and `audit_trace`.
 
 Policies are externalized in `eaas/policies/corsi_policies.json`.
