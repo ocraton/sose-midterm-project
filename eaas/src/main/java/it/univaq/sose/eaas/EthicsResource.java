@@ -221,6 +221,7 @@ public class EthicsResource {
         }
 
         try {
+            // valutazione della condizione con JEXL: se c'e' un errore di valutazione consideriamo la policy non applicabile (false)
             JexlExpression expression = jexl.createExpression(conditionString);
             return Boolean.TRUE.equals(expression.evaluate(context));
         } catch (Exception evalException) {
